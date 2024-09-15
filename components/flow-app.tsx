@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isToday, differenceInDays, parseISO, startOfDay } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isToday } from 'date-fns'
 import { motion } from 'framer-motion'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -36,6 +36,7 @@ export function FlowAppComponent() {
   const [workTypes, setWorkTypes] = useState<WorkType[]>([])
   const [newWorkType, setNewWorkType] = useState('')
   const [isDarkMode, setIsDarkMode] = useState(true)
+  const [pausedTime, setPausedTime] = useState<number | null>(null)
 
   useEffect(() => {
     const storedHistory = localStorage.getItem('studyHistory')
@@ -88,7 +89,7 @@ export function FlowAppComponent() {
         })
       }
       setSessionStartTime(null)
-      notifyUser()
+      setPausedTime(null)
     }
 
     return () => {
@@ -98,18 +99,25 @@ export function FlowAppComponent() {
 
   const toggleTimer = useCallback(() => {
     if (!isActive) {
-      setTime(parseInt(inputTime, 10) * 60)
+      if (pausedTime) {
+        setTime(pausedTime)
+        setPausedTime(null)
+      } else {
+        setTime(parseInt(inputTime, 10) * 60)
+      }
       setSessionStartTime(Date.now())
     } else {
+      setPausedTime(time)
       setSessionStartTime(null)
     }
     setIsActive(!isActive)
-  }, [isActive, inputTime])
+  }, [isActive, inputTime, time, pausedTime])
 
   const resetTimer = useCallback(() => {
     setIsActive(false)
     setTime(parseInt(inputTime, 10) * 60)
     setSessionStartTime(null)
+    setPausedTime(null)
   }, [inputTime])
 
   const formatTime = useCallback((seconds: number) => {
@@ -117,27 +125,6 @@ export function FlowAppComponent() {
     const secs = seconds % 60
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }, [])
-
-  const notifyUser = useCallback(() => {
-    if ('Notification' in window) {
-      if (Notification.permission === 'granted') {
-        new Notification('Flow Session Complete!', {
-          body: `Great job! You completed ${selectedWorkType}.`,
-          icon: '/placeholder.svg?height=64&width=64'
-        })
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-          if (permission === 'granted') {
-            new Notification('Flow Session Complete!', {
-              body: `Great job! You completed ${selectedWorkType}.`,
-              icon: '/placeholder.svg?height=64&width=64'
-            })
-          }
-        })
-      }
-    }
-    alert(`Flow Session Complete! You completed ${selectedWorkType}.`)
-  }, [selectedWorkType])
 
   const getChartData = useCallback(() => {
     const [year, month] = selectedMonth.split('-')
@@ -219,42 +206,11 @@ export function FlowAppComponent() {
     const sortedHistory = [...studyHistory].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     const firstStudyDay = new Date(sortedHistory[0].date)
     const lastStudyDay = new Date(sortedHistory[sortedHistory.length - 1].date)
-    const totalDays = differenceInDays(lastStudyDay, firstStudyDay) + 1
+    const totalDays = Math.floor((lastStudyDay.getTime() - firstStudyDay.getTime()) / (1000 * 3600 * 24)) + 1
     const totalHours = sortedHistory.reduce((sum, session) => sum + session.duration / 60, 0)
 
     return totalHours / totalDays
   }, [studyHistory])
-
-  const getStreakInfo = useCallback(() => {
-    if (studyHistory.length === 0) return { currentStreak: 0, longestStreak: 0 }
-
-    const sortedHistory = [...studyHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    
-    let currentStreak = 0
-    let longestStreak = 0
-    let currentDate = startOfDay(new Date())
-    let streakBroken = false
-
-    const studyDays = new Set(sortedHistory.map(session => format(parseISO(session.date), 'yyyy-MM-dd')))
-
-    while (studyDays.has(format(currentDate, 'yyyy-MM-dd'))) {
-      if (!streakBroken) {
-        currentStreak++
-      }
-      longestStreak = Math.max(longestStreak, currentStreak)
-      currentDate = new Date(currentDate.getTime() - 86400000) // Subtract one day
-    }
-
-    // Check if the streak is broken
-    if (differenceInDays(new Date(), currentDate) > 1) {
-      streakBroken = true
-      currentStreak = 0
-    }
-
-    return { currentStreak, longestStreak }
-  }, [studyHistory])
-
-  const { currentStreak, longestStreak } = useMemo(() => getStreakInfo(), [getStreakInfo])
 
   const currentDate = new Date()
   const currentMonth = format(currentDate, 'yyyy-MM')
@@ -557,14 +513,6 @@ export function FlowAppComponent() {
                     <div>
                       <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Average Time Per Day</h4>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white">{averageTimePerDay.toFixed(2)} hours</p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Current Streak</h4>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{currentStreak} days</p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Longest Streak</h4>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{longestStreak} days</p>
                     </div>
                   </div>
                 </CardContent>
