@@ -89,6 +89,22 @@ export function FlowAppComponent() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [pausedTime, setPausedTime] = useState<number | null>(null);
 
+  const [year, month] = selectedMonth.split("-");
+
+  // 1. Add this code block here, before rendering the calendar
+  const firstDayOfMonth = startOfMonth(
+    new Date(parseInt(year), parseInt(month) - 1),
+  );
+  const startDayOfWeek = firstDayOfMonth.getDay(); // 0 (Sunday) to 6 (Saturday)
+
+  // Generate empty cells for padding before the first day of the month
+  const paddingDays = Array.from({ length: startDayOfWeek }, (_, i) => (
+    <div
+      key={`empty-${i}`}
+      className="text-center p-2 rounded-md bg-transparent"
+    ></div>
+  ));
+
   useEffect(() => {
     const storedHistory = localStorage.getItem("studyHistory");
     const storedWorkTypes = localStorage.getItem("workTypes");
@@ -126,24 +142,21 @@ export function FlowAppComponent() {
       }, 1000);
     } else if (time === 0) {
       setIsActive(false);
-
       if (sessionStartTime !== null) {
-        const initialDuration = parseInt(inputTime, 10) * 60; // initial duration in seconds
-        const actualDuration = (initialDuration - time) / 60; // actual duration in minutes
-
+        const actualDuration = Math.round(
+          (Date.now() - sessionStartTime) / 60000,
+        );
         const newSession: StudySession = {
           date: new Date().toISOString(),
-          duration: Math.round(actualDuration),
+          duration: actualDuration,
           workType: selectedWorkType,
         };
-
         setStudyHistory((prevHistory) => {
           const updatedHistory = [...prevHistory, newSession];
           localStorage.setItem("studyHistory", JSON.stringify(updatedHistory));
           return updatedHistory;
         });
       }
-
       setSessionStartTime(null);
       setPausedTime(null);
     }
@@ -151,7 +164,7 @@ export function FlowAppComponent() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isActive, time, sessionStartTime, selectedWorkType, inputTime]);
+  }, [isActive, time, sessionStartTime, selectedWorkType]);
 
   const toggleTimer = useCallback(() => {
     if (!isActive) {
@@ -492,6 +505,7 @@ export function FlowAppComponent() {
                     </Button>
                   </div>
                   <div className="grid grid-cols-7 gap-2">
+                    {/* Render the days of the week headers */}
                     {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
                       (day) => (
                         <div
@@ -502,6 +516,11 @@ export function FlowAppComponent() {
                         </div>
                       ),
                     )}
+
+                    {/* Add padding for the empty days before the first day of the month */}
+                    {paddingDays}
+
+                    {/* Render actual days of the month */}
                     {chartData.map((day, index) => {
                       const [year, month] = selectedMonth.split("-");
                       const currentDay = new Date(
