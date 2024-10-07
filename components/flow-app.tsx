@@ -91,33 +91,23 @@ export function FlowAppComponent() {
 
   const [year, month] = selectedMonth.split("-");
 
-  // 1. Add this code block here, before rendering the calendar
+  // 1. Generate empty cells for padding before the first day of the month
   const firstDayOfMonth = startOfMonth(
     new Date(parseInt(year), parseInt(month) - 1),
   );
   const startDayOfWeek = firstDayOfMonth.getDay(); // 0 (Sunday) to 6 (Saturday)
-
-  // Generate empty cells for padding before the first day of the month
   const paddingDays = Array.from({ length: startDayOfWeek }, (_, i) => (
-    <div
-      key={`empty-${i}`}
-      className="text-center p-2 rounded-md bg-transparent"
-    ></div>
+    <div key={`empty-${i}`} className="text-center p-2 rounded-md bg-transparent"></div>
   ));
 
+  // 2. Load and Save Study History and Settings from LocalStorage
   useEffect(() => {
     const storedHistory = localStorage.getItem("studyHistory");
     const storedWorkTypes = localStorage.getItem("workTypes");
     const storedDarkMode = localStorage.getItem("darkMode");
-    if (storedHistory) {
-      setStudyHistory(JSON.parse(storedHistory));
-    }
-    if (storedWorkTypes) {
-      setWorkTypes(JSON.parse(storedWorkTypes));
-    }
-    if (storedDarkMode !== null) {
-      setIsDarkMode(JSON.parse(storedDarkMode));
-    }
+    if (storedHistory) setStudyHistory(JSON.parse(storedHistory));
+    if (storedWorkTypes) setWorkTypes(JSON.parse(storedWorkTypes));
+    if (storedDarkMode !== null) setIsDarkMode(JSON.parse(storedDarkMode));
   }, []);
 
   useEffect(() => {
@@ -133,6 +123,7 @@ export function FlowAppComponent() {
     }
   }, [isDarkMode]);
 
+  // 3. Handle Timer Logic
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
 
@@ -195,6 +186,7 @@ export function FlowAppComponent() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }, []);
 
+  // 4. Chart Data Calculation
   const getChartData = useCallback(() => {
     const [year, month] = selectedMonth.split("-");
     const startDate = startOfMonth(
@@ -231,18 +223,7 @@ export function FlowAppComponent() {
 
   const chartData = useMemo(() => getChartData(), [getChartData]);
 
-  const handleMonthChange = useCallback((value: string) => {
-    setSelectedMonth(value);
-  }, []);
-
-  const handlePrevMonth = useCallback(() => {
-    setSelectedMonth(format(subMonths(new Date(selectedMonth), 1), "yyyy-MM"));
-  }, [selectedMonth]);
-
-  const handleNextMonth = useCallback(() => {
-    setSelectedMonth(format(addMonths(new Date(selectedMonth), 1), "yyyy-MM"));
-  }, [selectedMonth]);
-
+  // 5. Add New Work Type Logic
   const addWorkType = useCallback(() => {
     if (newWorkType && !workTypes.includes(newWorkType)) {
       setWorkTypes((prev) => [...prev, newWorkType]);
@@ -250,10 +231,12 @@ export function FlowAppComponent() {
     }
   }, [newWorkType, workTypes]);
 
+  // 6. Remove Work Type
   const removeWorkType = useCallback((typeToRemove: WorkType) => {
     setWorkTypes((prev) => prev.filter((type) => type !== typeToRemove));
   }, []);
 
+  // 7. Work Breakdown Calculation (For Pie Chart)
   const getWorkBreakdown = useCallback(() => {
     const today = new Date();
     const startDate = startOfMonth(today);
@@ -277,30 +260,44 @@ export function FlowAppComponent() {
 
   const workBreakdown = useMemo(() => getWorkBreakdown(), [getWorkBreakdown]);
 
+  // 8. Calculate Total Time Worked
   const totalTimeWorked = useMemo(() => {
     return workBreakdown.reduce((total, item) => total + item.value, 0);
   }, [workBreakdown]);
 
+  // 9. Calculate Average Time Per Day
   const averageTimePerDay = useMemo(() => {
     if (studyHistory.length === 0) return 0;
 
-    const sortedHistory = [...studyHistory].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-    );
-    const firstStudyDay = new Date(sortedHistory[0].date);
-    const lastStudyDay = new Date(sortedHistory[sortedHistory.length - 1].date);
-    const totalDays =
-      Math.floor(
-        (lastStudyDay.getTime() - firstStudyDay.getTime()) / (1000 * 3600 * 24),
-      ) + 1;
-    const totalHours = sortedHistory.reduce(
-      (sum, session) => sum + session.duration / 60,
-      0,
+    // Calculate unique days with study sessions
+    const uniqueStudyDays = new Set(
+      studyHistory.map((session) => new Date(session.date).toDateString())
     );
 
-    return totalHours / totalDays;
+    // Total study time in hours
+    const totalHours = studyHistory.reduce(
+      (sum, session) => sum + session.duration / 60,
+      0
+    );
+
+    // Return average hours per unique study day
+    return totalHours / uniqueStudyDays.size;
   }, [studyHistory]);
 
+  // 10. Handle Month Change
+  const handleMonthChange = useCallback((value: string) => {
+    setSelectedMonth(value);
+  }, []);
+
+  const handlePrevMonth = useCallback(() => {
+    setSelectedMonth(format(subMonths(new Date(selectedMonth), 1), "yyyy-MM"));
+  }, [selectedMonth]);
+
+  const handleNextMonth = useCallback(() => {
+    setSelectedMonth(format(addMonths(new Date(selectedMonth), 1), "yyyy-MM"));
+  }, [selectedMonth]);
+
+  // 11. Return the full UI
   const currentDate = new Date();
   const currentMonth = format(currentDate, "yyyy-MM");
 
@@ -325,21 +322,15 @@ export function FlowAppComponent() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
+            {/* Timer Card */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
               <Card className="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-gray-700 rounded-md shadow-sm h-full">
                 <CardHeader className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                   <Clock className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                 </CardHeader>
                 <CardContent className="p-4 flex flex-col justify-between h-[calc(100%-60px)]">
                   <div className="flex flex-col items-center gap-4">
-                    <div
-                      className="text-6xl font-light tracking-tight"
-                      aria-live="polite"
-                    >
+                    <div className="text-6xl font-light tracking-tight" aria-live="polite">
                       {formatTime(time)}
                     </div>
                     <div className="flex flex-col items-center gap-4 w-full">
@@ -353,9 +344,7 @@ export function FlowAppComponent() {
                           min="1"
                           aria-label="Set timer duration in minutes"
                         />
-                        <span className="text-sm text-gray-600 dark:text-gray-400 font-normal">
-                          minutes
-                        </span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400 font-normal">minutes</span>
                       </div>
                       <Popover>
                         <PopoverTrigger asChild>
@@ -370,19 +359,12 @@ export function FlowAppComponent() {
                         <PopoverContent className="w-64 bg-white dark:bg-[#161b22]">
                           <div className="grid gap-4">
                             <div className="space-y-2">
-                              <h4 className="font-medium leading-none text-gray-900 dark:text-white">
-                                Work Types
-                              </h4>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Select or manage your work types.
-                              </p>
+                              <h4 className="font-medium leading-none text-gray-900 dark:text-white">Work Types</h4>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">Select or manage your work types.</p>
                             </div>
                             <div className="grid gap-2">
                               {workTypes.map((type) => (
-                                <div
-                                  key={type}
-                                  className="flex items-center justify-between"
-                                >
+                                <div key={type} className="flex items-center justify-between">
                                   <Button
                                     variant="ghost"
                                     className="w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#30363d]"
@@ -408,10 +390,7 @@ export function FlowAppComponent() {
                                 onChange={(e) => setNewWorkType(e.target.value)}
                                 className="flex-1 bg-white dark:bg-[#0d1117] border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
                               />
-                              <Button
-                                onClick={addWorkType}
-                                className="bg-green-600 hover:bg-green-700 text-white"
-                              >
+                              <Button onClick={addWorkType} className="bg-green-600 hover:bg-green-700 text-white">
                                 <Plus className="h-4 w-4" />
                               </Button>
                             </div>
@@ -421,9 +400,7 @@ export function FlowAppComponent() {
                       <Button
                         onClick={toggleTimer}
                         className={`w-full py-2 text-base font-medium rounded-md transition-colors duration-200 ${
-                          isActive
-                            ? "bg-red-600 hover:bg-red-700 text-white"
-                            : "bg-green-600 hover:bg-green-700 text-white"
+                          isActive ? "bg-red-600 hover:bg-red-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"
                         }`}
                       >
                         {isActive ? "Pause" : "Start"}
@@ -441,11 +418,8 @@ export function FlowAppComponent() {
               </Card>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
-            >
+            {/* Calendar and Charts */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
               <Card className="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-gray-700 rounded-md shadow-sm">
                 <CardHeader className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                   <Calendar className="h-5 w-5 text-gray-700 dark:text-gray-300" />
@@ -458,18 +432,12 @@ export function FlowAppComponent() {
                       className="p-2 bg-white dark:bg-[#21262d] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#30363d]"
                       disabled={
                         selectedMonth ===
-                        format(
-                          new Date(currentDate.getFullYear(), 0),
-                          "yyyy-MM",
-                        )
+                        format(new Date(currentDate.getFullYear(), 0), "yyyy-MM")
                       }
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
-                    <Select
-                      value={selectedMonth}
-                      onValueChange={handleMonthChange}
-                    >
+                    <Select value={selectedMonth} onValueChange={handleMonthChange}>
                       <SelectTrigger className="w-[180px] bg-white dark:bg-[#21262d] border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white">
                         <SelectValue placeholder="Select month" />
                       </SelectTrigger>
@@ -477,17 +445,9 @@ export function FlowAppComponent() {
                         {Array.from(
                           { length: currentDate.getMonth() + 1 },
                           (_, i) => {
-                            const date = new Date(
-                              currentDate.getFullYear(),
-                              i,
-                              1,
-                            );
+                            const date = new Date(currentDate.getFullYear(), i, 1);
                             return (
-                              <SelectItem
-                                key={i}
-                                value={format(date, "yyyy-MM")}
-                                className="text-gray-700 dark:text-gray-300"
-                              >
+                              <SelectItem key={i} value={format(date, "yyyy-MM")} className="text-gray-700 dark:text-gray-300">
                                 {format(date, "MMMM yyyy")}
                               </SelectItem>
                             );
@@ -505,17 +465,11 @@ export function FlowAppComponent() {
                     </Button>
                   </div>
                   <div className="grid grid-cols-7 gap-2">
-                    {/* Render the days of the week headers */}
-                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
-                      (day) => (
-                        <div
-                          key={day}
-                          className="text-center font-medium text-gray-500 dark:text-gray-400"
-                        >
-                          {day}
-                        </div>
-                      ),
-                    )}
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                      <div key={day} className="text-center font-medium text-gray-500 dark:text-gray-400">
+                        {day}
+                      </div>
+                    ))}
 
                     {/* Add padding for the empty days before the first day of the month */}
                     {paddingDays}
@@ -538,8 +492,8 @@ export function FlowAppComponent() {
                             isCurrentDay
                               ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100"
                               : hasActivity
-                                ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
-                                : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                              ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
+                              : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
                           }`}
                         >
                           <div className="font-medium">{day.date}</div>
@@ -565,12 +519,8 @@ export function FlowAppComponent() {
               </Card>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.2 }}
-              className="md:col-span-2"
-            >
+            {/* Bar Chart */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }} className="md:col-span-2">
               <Card className="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-gray-700 rounded-md shadow-sm">
                 <CardHeader className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                   <BarChart2 className="h-5 w-5 text-gray-700 dark:text-gray-300" />
@@ -578,10 +528,7 @@ export function FlowAppComponent() {
                 <CardContent className="p-4">
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={chartData}
-                        margin={{ top: 20, right: 30, left: 30, bottom: 5 }}
-                      >
+                      <BarChart data={chartData} margin={{ top: 20, right: 30, left: 30, bottom: 5 }}>
                         <XAxis
                           dataKey="date"
                           interval={0}
@@ -610,10 +557,7 @@ export function FlowAppComponent() {
                             borderColor: isDarkMode ? "#30363d" : "#d0d7de",
                             borderRadius: "6px",
                           }}
-                          formatter={(value: number, name: string) => [
-                            `${name}: ${value.toFixed(2)}`,
-                            "No. of Hours",
-                          ]}
+                          formatter={(value: number, name: string) => [`${name}: ${value.toFixed(2)}`, "No. of Hours"]}
                           labelFormatter={(label) => `Date: ${label}`}
                         />
                         <Legend />
@@ -633,12 +577,8 @@ export function FlowAppComponent() {
               </Card>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.3 }}
-              className="md:col-span-1"
-            >
+            {/* Pie Chart and Stats */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.3 }} className="md:col-span-1">
               <Card className="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-gray-700 rounded-md shadow-sm h-full">
                 <CardHeader className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                   <PieChartIcon className="h-5 w-5 text-gray-700 dark:text-gray-300" />
@@ -655,23 +595,13 @@ export function FlowAppComponent() {
                           cy="50%"
                           outerRadius={80}
                           fill="#8884d8"
-                          label={({ name, percent }) =>
-                            `${name} ${(percent * 100).toFixed(0)}%`
-                          }
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         >
                           {workBreakdown.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={githubBlues[index % githubBlues.length]}
-                            />
+                            <Cell key={`cell-${index}`} fill={githubBlues[index % githubBlues.length]} />
                           ))}
                         </Pie>
-                        <Tooltip
-                          formatter={(value: number) => [
-                            value.toFixed(2),
-                            "Hours",
-                          ]}
-                        />
+                        <Tooltip formatter={(value: number) => [value.toFixed(2), "Hours"]} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -679,12 +609,8 @@ export function FlowAppComponent() {
               </Card>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.4 }}
-              className="md:col-span-1"
-            >
+            {/* Summary Stats */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.4 }} className="md:col-span-1">
               <Card className="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-gray-700 rounded-md shadow-sm h-full">
                 <CardHeader className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                   <BarChartIcon className="h-5 w-5 text-gray-700 dark:text-gray-300" />
@@ -692,20 +618,12 @@ export function FlowAppComponent() {
                 <CardContent className="p-4">
                   <div className="space-y-4">
                     <div>
-                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                        Total Time
-                      </h4>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {totalTimeWorked.toFixed(2)} hours
-                      </p>
+                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Time</h4>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalTimeWorked.toFixed(2)} hours</p>
                     </div>
                     <div>
-                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                        Average Time Per Day
-                      </h4>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {averageTimePerDay.toFixed(2)} hours
-                      </p>
+                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Average Time Per Day</h4>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{averageTimePerDay.toFixed(2)} hours</p>
                     </div>
                   </div>
                 </CardContent>
@@ -717,4 +635,3 @@ export function FlowAppComponent() {
     </div>
   );
 }
-
