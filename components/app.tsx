@@ -59,7 +59,7 @@ type WorkType = string;
 
 type StudySession = {
   date: string;
-  duration: number;
+  duration: number; // Duration in minutes
   workType: WorkType;
 };
 
@@ -75,19 +75,20 @@ const githubBlues = [
 ];
 
 export function FlowAppComponent() {
-  const [time, setTime] = useState(60 * 60);
+  const [time, setTime] = useState(60 * 60); // Remaining time in seconds
   const [isActive, setIsActive] = useState(false);
-  const [inputTime, setInputTime] = useState("60");
+  const [inputTime, setInputTime] = useState("60"); // User input in minutes
   const [studyHistory, setStudyHistory] = useState<StudySession[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(
     format(new Date(), "yyyy-MM"),
   );
-  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
   const [selectedWorkType, setSelectedWorkType] = useState<WorkType>("");
   const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
   const [newWorkType, setNewWorkType] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [pausedTime, setPausedTime] = useState<number | null>(null);
+
+  const [elapsedTime, setElapsedTime] = useState(0); // Cumulative elapsed time in seconds
 
   const [year, month] = selectedMonth.split("-");
 
@@ -123,20 +124,19 @@ export function FlowAppComponent() {
     }
   }, [isDarkMode]);
 
-  // 3. Handle Timer Logic
+  // 3. Handle Timer Logic with Cumulative Elapsed Time
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
 
     if (isActive && time > 0) {
       interval = setInterval(() => {
         setTime((prevTime) => prevTime - 1);
+        setElapsedTime((prevElapsed) => prevElapsed + 1);
       }, 1000);
     } else if (time === 0) {
       setIsActive(false);
-      if (sessionStartTime !== null) {
-        const actualDuration = Math.round(
-          (Date.now() - sessionStartTime) / 60000,
-        );
+      if (elapsedTime > 0) {
+        const actualDuration = Math.round(elapsedTime / 60); // Convert to minutes
         const newSession: StudySession = {
           date: new Date().toISOString(),
           duration: actualDuration,
@@ -148,14 +148,14 @@ export function FlowAppComponent() {
           return updatedHistory;
         });
       }
-      setSessionStartTime(null);
+      setElapsedTime(0); // Reset elapsed time for the next session
       setPausedTime(null);
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isActive, time, sessionStartTime, selectedWorkType]);
+  }, [isActive, time, elapsedTime, selectedWorkType]);
 
   const toggleTimer = useCallback(() => {
     if (!isActive) {
@@ -165,18 +165,17 @@ export function FlowAppComponent() {
       } else {
         setTime(parseInt(inputTime, 10) * 60);
       }
-      setSessionStartTime(Date.now());
+      setIsActive(true);
     } else {
       setPausedTime(time);
-      setSessionStartTime(null);
+      setIsActive(false);
     }
-    setIsActive(!isActive);
   }, [isActive, inputTime, time, pausedTime]);
 
   const resetTimer = useCallback(() => {
     setIsActive(false);
     setTime(parseInt(inputTime, 10) * 60);
-    setSessionStartTime(null);
+    setElapsedTime(0); // Reset elapsed time
     setPausedTime(null);
   }, [inputTime]);
 
